@@ -25,10 +25,10 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+   const supabaseClient = createClient(
+  Deno.env.get('PUBLIC_SUPABASE_URL') ?? '',
+  Deno.env.get('SERVICE_ROLE_KEY') ?? ''
+)
 
     const { action, ...data } = await req.json()
 
