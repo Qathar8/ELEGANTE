@@ -25,94 +25,98 @@ serve(async (req) => {
   }
 
   try {
-   const supabaseClient = createClient(
-  Deno.env.get('PUBLIC_SUPABASE_URL') ?? '',
-  Deno.env.get('SERVICE_ROLE_KEY') ?? ''
-)
+    const supabase = createClient(
+      Deno.env.get('PUBLIC_SUPABASE_URL') ?? '',
+      Deno.env.get('SERVICE_ROLE_KEY') ?? ''
+    )
 
     const { action, ...data } = await req.json()
 
     if (action === 'create_user') {
       const { username, password, role } = data as CreateUserRequest
-      
-      // Hash password server-side
-      const hashedPassword = await bcrypt.hash(password, 10)
-      
-      const { data: user, error } = await supabaseClient
+
+      const hashedPassword = await bcrypt.hash(password)
+
+      const { data: user, error } = await supabase
         .from('users')
-        .insert([{
-          username,
-          password: hashedPassword,
-          role
-        }])
+        .insert([{ username, password: hashedPassword, role }])
         .select()
         .single()
 
       if (error) {
-        return new Response(
-          JSON.stringify({ error: error.message }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
       }
 
-      return new Response(
-        JSON.stringify({ success: true, user: { id: user.id, username: user.username, role: user.role } }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({
+        success: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     if (action === 'login') {
       const { username, password } = data as LoginRequest
-      
-      const { data: user, error } = await supabaseClient
+
+      const { data: user, error } = await supabase
         .from('users')
         .select('*')
         .eq('username', username)
         .maybeSingle()
 
       if (error || !user) {
-        return new Response(
-          JSON.stringify({ error: 'User not found' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        return new Response(JSON.stringify({ error: 'User not found' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
 
-      const isValidPassword = await bcrypt.compare(password, user.password)
-      if (!isValidPassword) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid password' }),
-          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+      const isMatch = await bcrypt.compare(password, user.password)
+      if (!isMatch) {
+        return new Response(JSON.stringify({ error: 'Invalid password' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
 
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          user: { id: user.id, username: user.username, role: user.role } 
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({
+        success: true,
+        user: {
+          id: user.id,
+          username: user.username,
+          role: user.role
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     if (action === 'create_default_admin') {
-      // Check if admin user already exists
-      const { data: existingUser } = await supabaseClient
+      const { data: existing } = await supabase
         .from('users')
         .select('id')
         .eq('username', 'admin')
         .maybeSingle()
 
-      if (existingUser) {
-        return new Response(
-          JSON.stringify({ success: true, message: 'Admin user already exists' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+      if (existing) {
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Admin already exists'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
 
-      // Hash the password server-side
-      const hashedPassword = await bcrypt.hash('admin123', 10)
+      const hashedPassword = await bcrypt.hash('admin123')
 
-      const { error } = await supabaseClient
+      const { error } = await supabase
         .from('users')
         .insert([{
           username: 'admin',
@@ -121,27 +125,30 @@ serve(async (req) => {
         }])
 
       if (error) {
-        return new Response(
-          JSON.stringify({ error: error.message }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
 
-      return new Response(
-        JSON.stringify({ success: true, message: 'Default admin user created' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'Admin created'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    return new Response(
-      JSON.stringify({ error: 'Invalid action' }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    // Unknown action
+    return new Response(JSON.stringify({ error: 'Invalid action' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
 
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
 })
